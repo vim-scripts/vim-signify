@@ -15,7 +15,7 @@ Features:
 - fully configurable through global variables (options and mappings)
 - optional preserving of signs from other plugins
 - you can toggle the plugin per buffer
-- exception lists for filetypes and filenames
+- skip certain filetypes and filenames
 - good documentation
 
 - quick developer response! :-)
@@ -100,6 +100,8 @@ let g:signify_mapping_prev_hunk = '<leader>gk'
 Note: In case you don't know about the mapleader, have a look at `:h mapleader`.
 The default is the '\' button.
 
+Following Vim conventions you can also use __[c__ and __]c__.
+
 #### apart from signs there is also optional line highlighting
 
 Sy shows you signs for changed lines. Moveover, you can enable highlighting of
@@ -126,16 +128,16 @@ it:
 let g:signify_mapping_toggle = '<leader>gt'
 ```
 
-#### exception lists for filetypes and filenames
+#### skip certain filetypes and filenames
 
 If you want to disable Sy for certain kinds of filename or file types,
-you explicitely have to create exception lists:
+you explicitely have to create "skip dicts":
 
 Example:
 
 ```vim
-let g:signify_exceptions_filetype = [ 'vim', 'c' ]
-let g:signify_exceptions_filename = [ '.vimrc' ]
+let g:signify_skip_filetype = { 'vim': 1, 'c': 1 }
+let g:signify_skip_filename = { '/home/user/.vimrc': 1 }
 ```
 
 #### good documentation
@@ -169,8 +171,8 @@ let g:signify_mapping_prev_hunk = '<leader>gp'
 let g:signify_mapping_toggle_highlight = '<leader>gh'
 let g:signify_mapping_toggle           = '<leader>gt'
 
-let g:signify_exceptions_filetype = [ 'vim', 'c' ]
-let g:signify_exceptions_filename = [ '.vimrc' ]
+let g:signify_skip_filetype = { 'vim': 1, 'c': 1 }
+let g:signify_skip_filename = { '/home/user/.vimrc': 1 }
 
 let g:signify_sign_overwrite = 1
 

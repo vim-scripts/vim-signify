@@ -114,8 +114,8 @@ Mapping for toggling line highlighting for lines containing changes.
 Mapping for toggling the plugin for the current buffer only.
 
 
-    let g:signify_exceptions_filetype = [ 'vim', 'c' ]
-    let g:signify_exceptions_filename = [ '.vimrc' ]
+    let g:signify_skip_filetype = { 'vim': 1, 'c': 1 }
+    let g:signify_skip_filename = { '/home/user/.vimrc': 1 }
 
 Don't activate the plugin for these filetypes and/or filenames.
 
@@ -207,14 +207,18 @@ Default mapping:  <leader>gh
 
     :SignifyJumpToNextHunk
 
-Jump to the next hunk.
-Default mapping:  <leader>gn
+Jump to the next hunk. There are two mappings available:
+
+Hardcoded mapping:     [c
+Configurable mapping:  <leader>gn
 
 
     :SignifyJumpToPrevHunk
 
-Jump to the previous hunk.  
-Default mapping:  <leader>gp
+Jump to the previous hunk. There are two mappings available:
+
+Hardcoded mapping:     ]c
+Configurable mapping:  <leader>gp
 
 
 ==============================================================================
@@ -239,6 +243,7 @@ People who contributed to sy. Format: Person (Github account)
 Jeremy Mack     (mutewinter)
 Chong Li        (chongli)
 Robin Munn      (rmunn)
+Martin Hoch     (rtwo)
 
 
 ==============================================================================

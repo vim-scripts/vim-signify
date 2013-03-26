@@ -45,28 +45,33 @@ let s:id_start = 0x100
 let s:id_top   = s:id_start
 
 "  Default mappings  {{{1
+if !maparg('[c', 'n')
+  nnoremap <silent> [c :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
+  nnoremap <silent> ]c :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
+endif
+
 if exists('g:signify_mapping_next_hunk')
-  execute 'nnoremap '. g:signify_mapping_next_hunk .' :<c-u>execute v:count ."SignifyJumpToNextHunk"<cr>'
+  execute 'nnoremap <silent> '. g:signify_mapping_next_hunk .' :<c-u>execute v:count ."SignifyJumpToNextHunk"<cr>'
 else
-  nnoremap <leader>gj :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
+  nnoremap <silent> <leader>gj :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
 endif
 
 if exists('g:signify_mapping_prev_hunk')
-  execute 'nnoremap '. g:signify_mapping_prev_hunk .' :<c-u>execute v:count ."SignifyJumpToPrevHunk"<cr>'
+  execute 'nnoremap <silent> '. g:signify_mapping_prev_hunk .' :<c-u>execute v:count ."SignifyJumpToPrevHunk"<cr>'
 else
-  nnoremap <leader>gk :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
+  nnoremap <silent> <leader>gk :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
 endif
 
 if exists('g:signify_mapping_toggle_highlight')
-  execute 'nnoremap '. g:signify_mapping_toggle_highlight .' :SignifyToggleHighlight<cr>'
+  execute 'nnoremap <silent> '. g:signify_mapping_toggle_highlight .' :SignifyToggleHighlight<cr>'
 else
-  nnoremap <leader>gh :SignifyToggleHighlight<cr>
+  nnoremap <silent> <leader>gh :SignifyToggleHighlight<cr>
 endif
 
 if exists('g:signify_mapping_toggle')
-  execute 'nnoremap '. g:signify_mapping_toggle .' :SignifyToggle<cr>'
+  execute 'nnoremap <silent> '. g:signify_mapping_toggle .' :SignifyToggle<cr>'
 else
-  nnoremap <leader>gt :SignifyToggle<cr>
+  nnoremap <silent> <leader>gt :SignifyToggle<cr>
 endif
 
 "  Default signs  {{{1
@@ -139,20 +144,11 @@ function! s:start(path) abort
     execute 'sign place 99999 line=1 name=SignifyPlaceholder file='. a:path
   endif
 
-  " Check for exceptions.
-  if exists('g:signify_exceptions_filetype')
-    for i in g:signify_exceptions_filetype
-      if i == &ft
-        return
-      endif
-    endfor
+  if exists('g:signify_skip_filetype') && has_key(g:signify_skip_filetype, &ft)
+    return
   endif
-  if exists('g:signify_exceptions_filename')
-    for i in g:signify_exceptions_filename
-      if i == a:path
-        return
-      endif
-    endfor
+  if exists('g:signify_skip_filename') && has_key(g:signify_skip_filename, a:path)
+    return
   endif
 
   " New buffer.. add to list.
@@ -268,22 +264,15 @@ endfunction
 "  Functions -> s:repo_get_diff_git  {{{2
 function! s:repo_get_diff_git(path) abort
   if executable('git')
-    let orig_dir = fnameescape(getcwd())
-    execute 'cd '. fnameescape(fnamemodify(a:path, ':h'))
-    let diff = system('git diff --no-ext-diff -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
-    if !v:shell_error
-      execute 'cd '. orig_dir
-      return diff
-    endif
-    execute 'cd '. orig_dir
+    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && git diff --no-ext-diff -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    return v:shell_error ? '' : diff
   endif
-  return ''
 endfunction
 
 "  Functions -> s:repo_get_diff_hg  {{{2
 function! s:repo_get_diff_hg(path) abort
   if executable('hg')
-    let diff = system('hg diff --nodates -U0 -- '. a:path .' | grep --color=never "^@@ "')
+    let diff = system('hg diff --nodates -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
     return v:shell_error ? '' : diff
   endif
 endfunction
@@ -291,7 +280,7 @@ endfunction
 "  Functions -> s:repo_get_diff_svn  {{{2
 function! s:repo_get_diff_svn(path) abort
   if executable('svn')
-    let diff = system('svn diff --diff-cmd diff -x -U0 -- '. a:path .' | grep --color=never "^@@ "')
+    let diff = system('svn diff --diff-cmd diff -x -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
     return v:shell_error ? '' : diff
   endif
 endfunction
@@ -299,7 +288,7 @@ endfunction
 "  Functions -> s:repo_get_diff_bzr  {{{2
 function! s:repo_get_diff_bzr(path) abort
   if executable('bzr')
-    let diff = system('bzr diff --using diff --diff-options=-U0 -- '. a:path .' | grep --color=never "^@@ "')
+    let diff = system('bzr diff --using diff --diff-options=-U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
     return v:shell_error ? '' : diff
   endif
 endfunction
@@ -307,22 +296,15 @@ endfunction
 "  Functions -> s:repo_get_diff_darcs  {{{2
 function! s:repo_get_diff_darcs(path) abort
   if executable('darcs')
-    let orig_dir = fnameescape(getcwd())
-    execute 'cd '. fnameescape(fnamemodify(a:path, ':h'))
-    let diff = system('darcs diff --no-pause-for-gui --diff-command="diff -U0 %1 %2" -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
-    if !v:shell_error
-      execute 'cd '. orig_dir
-      return diff
-    endif
-    execute 'cd '. orig_dir
+    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && darcs diff --no-pause-for-gui --diff-command="diff -U0 %1 %2" -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    return v:shell_error ? '' : diff
   endif
-  return ''
 endfunction
 
 "  Functions -> s:repo_get_diff_cvs  {{{2
 function! s:repo_get_diff_cvs(path) abort
   if executable('cvs')
-    let diff = system('cvs diff -U0 -- '. a:path .' 2>&1 | grep --color=never "^@@ "')
+    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && cvs diff -U0 -- '. fnameescape(fnamemodify(a:path, ':t')) .' | grep --color=never "^@@ "')
     return v:shell_error ? '' : diff
   endif
 endfunction
@@ -330,7 +312,7 @@ endfunction
 "  Functions -> s:repo_get_diff_rcs  {{{2
 function! s:repo_get_diff_rcs(path) abort
   if executable('rcs')
-    let diff = system('rcsdiff -U0 '. a:path .' 2>/dev/null | grep --color=never "^@@ "')
+    let diff = system('rcsdiff -U0 '. fnameescape(a:path) .' 2>/dev/null | grep --color=never "^@@ "')
     return v:shell_error ? '' : diff
   endif
 endfunction
