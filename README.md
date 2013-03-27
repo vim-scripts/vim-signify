@@ -100,7 +100,7 @@ let g:signify_mapping_prev_hunk = '<leader>gk'
 Note: In case you don't know about the mapleader, have a look at `:h mapleader`.
 The default is the '\' button.
 
-Following Vim conventions you can also use __[c__ and __]c__.
+Following Vim conventions you can also use __]c__ and __[c__.
 
 #### apart from signs there is also optional line highlighting
 
@@ -165,8 +165,8 @@ __NOTE__: The shown assignments are only examples, not defaults.
 ```vim
 let g:signify_vcs_list = [ 'git', 'hg' ]
 
-let g:signify_mapping_next_hunk = '<leader>gn'
-let g:signify_mapping_prev_hunk = '<leader>gp'
+let g:signify_mapping_next_hunk = '<leader>gj'
+let g:signify_mapping_prev_hunk = '<leader>gk'
 
 let g:signify_mapping_toggle_highlight = '<leader>gh'
 let g:signify_mapping_toggle           = '<leader>gt'

@@ -44,10 +44,24 @@ let s:vcs_list = exists('g:signify_vcs_list') ? g:signify_vcs_list : [ 'git', 'h
 let s:id_start = 0x100
 let s:id_top   = s:id_start
 
+if has('win32')
+  if $VIMRUNTIME =~ ' '
+    let s:difftool = (&sh =~ '\<cmd') ? ('"'. $VIMRUNTIME .'\diff"') : (substitute($VIMRUNTIME, ' ', '" ', '') .'\diff"')
+  else
+    let s:difftool = $VIMRUNTIME .'\diff'
+  endif
+else
+  if !executable('diff')
+    echomsg 'signify: No diff tool found!'
+    finish
+  endif
+  let s:difftool = 'diff'
+endif
+
 "  Default mappings  {{{1
 if !maparg('[c', 'n')
-  nnoremap <silent> [c :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
-  nnoremap <silent> ]c :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
+  nnoremap <silent> ]c :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
+  nnoremap <silent> [c :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
 endif
 
 if exists('g:signify_mapping_next_hunk')
@@ -112,11 +126,11 @@ augroup signify
   autocmd!
 
   if exists('g:signify_cursorhold_normal') && (g:signify_cursorhold_normal == 1)
-    autocmd CursorHold * write | call s:start(s:file)
+    autocmd CursorHold * write | call s:start(s:path)
   endif
 
   if exists('g:signify_cursorhold_insert') && (g:signify_cursorhold_insert == 1)
-    autocmd CursorHoldI * write | call s:start(s:file)
+    autocmd CursorHoldI * write | call s:start(s:path)
   endif
 
   if !has('gui_win32')
@@ -124,8 +138,8 @@ augroup signify
   endif
 
   autocmd VimEnter,ColorScheme  * call s:colors_set()
-  autocmd BufEnter              * let s:file = resolve(expand('<afile>:p'))
-  autocmd BufEnter,BufWritePost * call s:start(s:file)
+  autocmd BufEnter              * let s:path = resolve(expand('<afile>:p'))
+  autocmd BufEnter,BufWritePost * call s:start(s:path)
 augroup END
 
 com! -nargs=0 -bar        SignifyToggle          call s:toggle_signify()
@@ -133,8 +147,7 @@ com! -nargs=0 -bar        SignifyToggleHighlight call s:toggle_line_highlighting
 com! -nargs=0 -bar -count SignifyJumpToNextHunk  call s:jump_to_next_hunk(<count>)
 com! -nargs=0 -bar -count SignifyJumpToPrevHunk  call s:jump_to_prev_hunk(<count>)
 
-"  Internal functions  {{{1
-"  Functions -> s:start()  {{{2
+"  Functions -> s:start()  {{{1
 function! s:start(path) abort
   if empty(a:path) || !filereadable(a:path) || &ft == 'help'
     return
@@ -185,10 +198,9 @@ function! s:start(path) abort
   sign unplace 99999
   let s:signmode = 1
   let s:sy[a:path].id_top = (s:id_top - 1)
-  let s:path = a:path
 endfunction
 
-"  Functions -> s:stop()  {{{2
+"  Functions -> s:stop()  {{{1
 function! s:stop(path) abort
   if !has_key(s:sy, a:path)
     return
@@ -207,21 +219,19 @@ function! s:stop(path) abort
   augroup END
 endfunction
 
-"  Functions -> s:sign_get_others()  {{{2
+"  Functions -> s:sign_get_others()  {{{1
 function! s:sign_get_others(path) abort
   redir => signlist
     sil! execute 'sign place file='. a:path
   redir END
 
-  for line in split(signlist, '\n')
-    if line =~ '\v^\s+\w+'
-      let lnum = matchlist(line, '\v^\s+\w+\=(\d+)')[1]
-      let s:other_signs_line_numbers[lnum] = 1
-    endif
+  for line in filter(split(signlist, '\n'), 'v:val =~ "\v^\s+\w+"')
+    let lnum = matchlist(line, '\v^\s+\w+\=(\d+)')[1]
+    let s:other_signs_line_numbers[lnum] = 1
   endfor
 endfunction
 
-"  Functions -> s:sign_set()  {{{2
+"  Functions -> s:sign_set()  {{{1
 function! s:sign_set(lnum, type, path)
   " Preserve non-signify signs
   if !s:sign_overwrite && has_key(s:other_signs_line_numbers, a:lnum)
@@ -234,7 +244,7 @@ function! s:sign_set(lnum, type, path)
   let s:id_top += 1
 endfunction
 
-"  Functions -> s:sign_remove_all()  {{{2
+"  Functions -> s:sign_remove_all()  {{{1
 function! s:sign_remove_all(path) abort
   for id in s:sy[a:path].ids
     execute 'sign unplace '. id
@@ -245,12 +255,8 @@ function! s:sign_remove_all(path) abort
   let s:sy[a:path].ids = []
 endfunction
 
-"  Functions -> s:repo_detect()  {{{2
+"  Functions -> s:repo_detect()  {{{1
 function! s:repo_detect(path) abort
-  if !executable('grep') || !executable('diff')
-    echo 'signify: I cannot work without grep and diff!'
-  endif
-
   for type in s:vcs_list
     let diff = s:repo_get_diff_{type}(a:path)
     if !empty(diff)
@@ -261,74 +267,69 @@ function! s:repo_detect(path) abort
   return [ '', '' ]
 endfunction
 
-"  Functions -> s:repo_get_diff_git  {{{2
+"  Functions -> s:repo_get_diff_git  {{{1
 function! s:repo_get_diff_git(path) abort
   if executable('git')
-    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && git diff --no-ext-diff -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    let diff = system('cd '. s:escape(fnamemodify(a:path, ':h')) .' && git diff --no-ext-diff -U0 -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_hg  {{{2
+"  Functions -> s:repo_get_diff_hg  {{{1
 function! s:repo_get_diff_hg(path) abort
   if executable('hg')
-    let diff = system('hg diff --nodates -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    let diff = system('hg diff --nodates -U0 -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_svn  {{{2
+"  Functions -> s:repo_get_diff_svn  {{{1
 function! s:repo_get_diff_svn(path) abort
   if executable('svn')
-    let diff = system('svn diff --diff-cmd diff -x -U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    let diff = system('svn diff --diff-cmd '. s:difftool .' -x -U0 -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_bzr  {{{2
+"  Functions -> s:repo_get_diff_bzr  {{{1
 function! s:repo_get_diff_bzr(path) abort
   if executable('bzr')
-    let diff = system('bzr diff --using diff --diff-options=-U0 -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    let diff = system('bzr diff --using '. s:difftool .' --diff-options=-U0 -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_darcs  {{{2
+"  Functions -> s:repo_get_diff_darcs  {{{1
 function! s:repo_get_diff_darcs(path) abort
   if executable('darcs')
-    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && darcs diff --no-pause-for-gui --diff-command="diff -U0 %1 %2" -- '. fnameescape(a:path) .' | grep --color=never "^@@ "')
+    let diff = system('cd '. s:escape(fnamemodify(a:path, ':h')) .' && darcs diff --no-pause-for-gui --diff-command="'. s:difftool .' -U0 %1 %2" -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_cvs  {{{2
+"  Functions -> s:repo_get_diff_cvs  {{{1
 function! s:repo_get_diff_cvs(path) abort
   if executable('cvs')
-    let diff = system('cd '. fnameescape(fnamemodify(a:path, ':h')) .' && cvs diff -U0 -- '. fnameescape(fnamemodify(a:path, ':t')) .' | grep --color=never "^@@ "')
+    let diff = system('cd '. s:escape(fnamemodify(a:path, ':h')) .' && cvs diff -U0 -- '. s:escape(fnamemodify(a:path, ':t')))
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_get_diff_rcs  {{{2
+"  Functions -> s:repo_get_diff_rcs  {{{1
 function! s:repo_get_diff_rcs(path) abort
   if executable('rcs')
-    let diff = system('rcsdiff -U0 '. fnameescape(a:path) .' 2>/dev/null | grep --color=never "^@@ "')
+    let diff = system('rcsdiff -U0 '. s:escape(a:path) .' 2>/dev/null')
     return v:shell_error ? '' : diff
   endif
 endfunction
 
-"  Functions -> s:repo_process_diff()  {{{2
+"  Functions -> s:repo_process_diff()  {{{1
 function! s:repo_process_diff(path, diff) abort
   " Determine where we have to put our signs.
-  for line in split(a:diff, '\n')
-    " Parse diff output.
+  for line in filter(split(a:diff, '\n'), 'v:val =~ "^@@"')
     let tokens = matchlist(line, '^\v\@\@ -(\d+),?(\d*) \+(\d+),?(\d*)')
-    if empty(tokens)
-      echo 'signify: I cannot parse this line "'. line .'"'
-      return
-    endif
 
-    let [ old_line, old_count, new_line, new_count ] = [ str2nr(tokens[1]), (tokens[2] == '') ? 1 : str2nr(tokens[2]), str2nr(tokens[3]), (tokens[4] == '') ? 1 : str2nr(tokens[4]) ]
+    let [ old_line, old_count, new_line, new_count ] = [ str2nr(tokens[1]), empty(tokens[2]) ? 1 : str2nr(tokens[2]), str2nr(tokens[3]), empty(tokens[4]) ? 1 : str2nr(tokens[4]) ]
 
     " A new line was added.
     if (old_count == 0) && (new_count >= 1)
@@ -376,7 +377,7 @@ function! s:repo_process_diff(path, diff) abort
   endfor
 endfunction
 
-"  Functions -> s:colors_set()  {{{2
+"  Functions -> s:colors_set()  {{{1
 function! s:colors_set() abort
   if has('gui_running')
     if exists('g:signify_sign_color_guibg')
@@ -463,10 +464,10 @@ function! s:colors_set() abort
   endif
 endfunction
 
-"  Functions -> s:toggle_signify()  {{{2
+"  Functions -> s:toggle_signify()  {{{1
 function! s:toggle_signify() abort
   if empty(s:path)
-    echo "signify: I don't sy empty buffers!"
+    echo 'signify: I cannot sy empty buffers!'
     return
   endif
 
@@ -478,11 +479,18 @@ function! s:toggle_signify() abort
       let s:sy[s:path].active = 1
       call s:start(s:path)
     endif
+  else
+    call s:start(s:path)
   endif
 endfunction
 
-"  Functions -> s:toggle_line_highlighting()  {{{2
+"  Functions -> s:toggle_line_highlighting()  {{{1
 function! s:toggle_line_highlighting() abort
+  if !has_key(s:sy, s:path)
+    echo 'signify: I cannot detect any changes!'
+    return
+  endif
+
   if s:line_highlight
     sign define SignifyAdd             text=+  texthl=SignifyAdd    linehl=none
     sign define SignifyChange          text=!  texthl=SignifyChange linehl=none
@@ -504,13 +512,13 @@ function! s:toggle_line_highlighting() abort
 
     let s:line_highlight = 1
   endif
-  call s:start(s:file)
+  call s:start(s:path)
 endfunction
 
-"  Functions -> s:jump_to_next_hunk()  {{{2
+"  Functions -> s:jump_to_next_hunk()  {{{1
 function! s:jump_to_next_hunk(count)
   if !has_key(s:sy, s:path) || s:sy[s:path].id_jump == -1
-    echo "signify: I cannot detect any changes!"
+    echo 'signify: I cannot detect any changes!'
     return
   endif
 
@@ -530,10 +538,10 @@ function! s:jump_to_next_hunk(count)
   let s:sy[s:path].last_jump_was_next = 1
 endfunction
 
-"  Functions -> s:jump_to_prev_hunk()  {{{2
+"  Functions -> s:jump_to_prev_hunk()  {{{1
 function! s:jump_to_prev_hunk(count)
   if !has_key(s:sy, s:path) || s:sy[s:path].id_jump == -1
-    echo "signify: I cannot detect any changes!"
+    echo 'signify: I cannot detect any changes!'
     return
   endif
 
@@ -553,7 +561,23 @@ function! s:jump_to_prev_hunk(count)
   let s:sy[s:path].last_jump_was_next = 0
 endfunction
 
-"  Functions -> SignifyDebugListActiveBuffers()  {{{2
+"  Functions -> s:s:escape()  {{{1
+function s:escape(path) abort
+  if exists('+shellslash')
+    let old_ssl = &shellslash
+    set noshellslash
+  endif
+
+  let path = shellescape(a:path)
+
+  if exists('old_ssl')
+    let &shellslash = old_ssl
+  endif
+
+  return path
+endfunction
+
+"  Functions -> SignifyDebugListActiveBuffers()  {{{1
 function! SignifyDebugListActiveBuffers() abort
   if len(s:sy) == 0
     echo 'No active buffers!'
