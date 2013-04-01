@@ -1,4 +1,5 @@
-# vim-signify
+vim-signify
+-----------
 
 Or just: __sy__
 
@@ -24,14 +25,16 @@ Features:
 
 Limits exist only in your mind!
 
-## Feedback, please!
+Feedback, please!
+-----------------
 
 If you use any of my plugins, star it on github. This is a great way of getting
 feedback! Same for issues or feature requests.
 
 Thank you for flying mhi airlines. Get the Vim on!
 
-## What about vim-gitgutter?
+What about vim-gitgutter?
+-------------------------
 
 To be honest, I don't understand why people always compare plugins like Sy to
 vim-gitgutter. I understand that it is by far the most known one, but primarily
@@ -51,7 +54,8 @@ So here is the short answer: The main difference is Sy its support for version
 control systems other than git. Moreover, two of its design goals are speed and
 high configurability.
 
-## Sign explanation
+Sign explanation
+----------------
 
 `+`
 
@@ -69,7 +73,8 @@ A line was changed. Something was changed, but the amount of lines stayed the sa
 
 A line was changed and one or more of the lines below were deleted. A combination of **!** and **_**. The sign is shown on the same line.
 
-## Longer introduction
+Longer introduction
+-------------------
 
 #### supports several version control systems
 
@@ -140,23 +145,35 @@ let g:signify_skip_filetype = { 'vim': 1, 'c': 1 }
 let g:signify_skip_filename = { '/home/user/.vimrc': 1 }
 ```
 
+__NOTE__: Filenames have to be absolute paths!
+
 #### good documentation
 
 You should know by now!
 
-## Installation
+Installation
+------------
 
-I suggest using tpope's pathogen:
+If you have no preferred installation method, I suggest using tpope's pathogen:
 
-- https://github.com/tpope/vim-pathogen
+1. git clone https://github.com/tpope/vim-pathogen ~/.vim/bundle/vim-pathogen
+1. mkdir -p ~/.vim/autoload && cd ~/.vim/autoload
+1. ln -s ../bundle/vim-pathogen/autoload/pathogen.vim
 
-Afterwards, just clone vim-signify into ~/.vim/bundle/.
+Afterwards installing Sy is as easy as pie:
 
-## Documentation
+2. git clone https://github.com/mhinz/vim-signify ~/.vim/bundle/vim-signify
+2. start Vim
+2. :Helptags
+2. :h signify
+
+Documentation
+-------------
 
 `:h signify`
 
-## Configuration
+Configuration
+-------------
 
 For more info: `:h signify-options`
 
@@ -205,10 +222,12 @@ let g:signify_cursorhold_normal = 1
 let g:signify_cursorhold_insert = 1
 ```
 
-## Author
+Author
+------
 
 Marco Hinz `<mh.codebro@gmail.com>`
 
-## License
+License
+-------
 
 Copyright © 2013 Marco Hinz. Revised BSD license.
