@@ -193,6 +193,10 @@ let g:signify_skip_filename = { '/home/user/.vimrc': 1 }
 
 let g:signify_sign_overwrite = 1
 
+let g:signify_update_on_bufenter = 1
+
+let g:signify_line_highlight = 1
+
 let g:signify_sign_add               = '+'
 let g:signify_sign_delete            = '-'
 let g:signify_sign_change            = '*'
@@ -215,8 +219,6 @@ let g:signify_sign_color_group_change = 'MyChange'
 let g:signify_line_color_add    = 'DiffAdd'
 let g:signify_line_color_delete = 'DiffDelete'
 let g:signify_line_color_change = 'DiffChange'
-
-let g:signify_enable_cvs = 1
 
 let g:signify_cursorhold_normal = 1
 let g:signify_cursorhold_insert = 1

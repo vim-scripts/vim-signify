@@ -1,7 +1,7 @@
 " Plugin:      https://github.com/mhinz/vim-signify
 " Description: show a diff from a version control system via the signcolumn
 " Maintainer:  Marco Hinz <http://github.com/mhinz>
-" Version:     1.3
+" Version:     1.5
 
 if exists('g:loaded_signify') || !has('signs') || &cp
   finish
@@ -10,13 +10,11 @@ let g:loaded_signify = 1
 
 " Init: values {{{1
 let s:sy = {}  " the main data structure
-let s:line_highlight = 0   " disable line highlighting
 let s:other_signs_line_numbers = {}
 
 " overwrite non-signify signs by default
-let s:sign_overwrite = exists('g:signify_sign_overwrite') ? g:signify_sign_overwrite : 1
-
-let s:vcs_list = exists('g:signify_vcs_list') ? g:signify_vcs_list : [ 'git', 'hg', 'svn', 'darcs', 'bzr', 'cvs', 'rcs' ]
+let s:sign_overwrite = get(g:, 'signify_sign_overwrite', 1)
+let s:vcs_list       = get(g:, 'signify_vcs_list', [ 'git', 'hg', 'svn', 'darcs', 'bzr', 'cvs', 'rcs' ])
 
 let s:id_start = 0x100
 let s:id_top   = s:id_start
@@ -72,26 +70,36 @@ sign define SignifyPlaceholder text=. texthl=SignifyChange linehl=none
 augroup signify
   autocmd!
 
-  if exists('g:signify_cursorhold_normal') && (g:signify_cursorhold_normal == 1)
-    autocmd CursorHold * write | call s:start(s:path)
+  autocmd BufEnter             * let s:path = resolve(expand('<afile>:p'))
+  autocmd BufWritePost         * call s:start(s:path)
+  autocmd VimEnter,ColorScheme * call s:colors_set()
+
+  if get(g:, 'signify_update_on_bufenter', 1)
+    autocmd BufEnter * call s:start(s:path)
   endif
 
-  if exists('g:signify_cursorhold_insert') && (g:signify_cursorhold_insert == 1)
-    autocmd CursorHoldI * write | call s:start(s:path)
+  if get(g:, 'signify_cursorhold_normal')
+    autocmd CursorHold *
+          \ if filewritable(s:path) && empty(&buftype) |
+          \   update | call s:start(s:path) |
+          \ endif
+  endif
+
+  if get(g:, 'signify_cursorhold_insert')
+    autocmd CursorHoldI *
+          \ if filewritable(s:path) && empty(&buftype) |
+          \   update | call s:start(s:path) |
+          \ endif
   endif
 
   if !has('gui_win32')
-    autocmd FocusGained * call s:start(resolve(expand('<afile>:p')))
+    autocmd FocusGained * call s:start(s:path)
   endif
-
-  autocmd VimEnter,ColorScheme  * call s:colors_set()
-  autocmd BufEnter              * let s:path = resolve(expand('<afile>:p'))
-  autocmd BufEnter,BufWritePost * call s:start(s:path)
 augroup END
 
 " Init: commands {{{1
 com! -nargs=0 -bar        SignifyToggle          call s:toggle_signify()
-com! -nargs=0 -bar        SignifyToggleHighlight call s:toggle_line_highlighting()
+com! -nargs=0 -bar        SignifyToggleHighlight call s:line_highlighting_toggle()
 com! -nargs=0 -bar -count SignifyJumpToNextHunk  call s:jump_to_next_hunk(<count>)
 com! -nargs=0 -bar -count SignifyJumpToPrevHunk  call s:jump_to_prev_hunk(<count>)
 
@@ -127,12 +135,11 @@ endif
 
 " Function: s:start {{{1
 function! s:start(path) abort
-  if exists('b:signmode') && b:signmode
+  if get(b:, 'signmode')
     execute 'sign place 99999 line=1 name=SignifyPlaceholder file='. a:path
   endif
 
-  if empty(a:path)
-        \ || !filereadable(a:path)
+  if !filereadable(a:path)
         \ || (exists('g:signify_skip_filetype') && has_key(g:signify_skip_filetype, &ft))
         \ || (exists('g:signify_skip_filename') && has_key(g:signify_skip_filename, a:path))
     return
@@ -162,6 +169,14 @@ function! s:start(path) abort
     let s:sy[a:path].id_top  = s:id_top
     let s:sy[a:path].id_jump = s:id_top
     let s:sy[a:path].last_jump_was_next = -1
+  endif
+
+  if !exists('s:line_highlight')
+    if get(g:, 'signify_line_highlight')
+      call s:line_highlighting_enable()
+    else
+      call s:line_highlighting_disable()
+    endif
   endif
 
   if !s:sign_overwrite
@@ -357,7 +372,7 @@ function! s:colors_set() abort
   if has('gui_running')
     if exists('g:signify_sign_color_guibg')
       let guibg = g:signify_sign_color_guibg
-    elseif exists('g:signify_sign_color_inherit_from_linenr')
+    elseif get(g:, 'signify_sign_color_inherit_from_linenr')
       let guibg = synIDattr(hlID('LineNr'), 'bg', 'gui')
     else
       let guibg = synIDattr(hlID('SignColumn'), 'bg', 'gui')
@@ -366,7 +381,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_add')
       execute 'hi! link SignifyAdd '. g:signify_sign_color_group_add
     else
-      let guifg_add = exists('g:signify_sign_color_guifg_add') ? g:signify_sign_color_guifg_add : '#11ee11'
+      let guifg_add = get(g:, 'signify_sign_color_guifg_add', '#11ee11')
       if empty(guibg) || guibg < 0
         execute 'hi SignifyAdd gui=bold guifg='. guifg_add
       else
@@ -377,7 +392,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_delete')
       execute 'hi! link SignifyDelete '. g:signify_sign_color_group_delete
     else
-      let guifg_delete = exists('g:signify_sign_color_guifg_delete') ? g:signify_sign_color_guifg_delete : '#ee1111'
+      let guifg_delete = get(g:, 'signify_sign_color_guifg_delete', '#ee1111')
       if empty(guibg) || guibg < 0
         execute 'hi SignifyDelete gui=bold guifg='. guifg_delete
       else
@@ -388,7 +403,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_change')
       execute 'hi! link SignifyChange '. g:signify_sign_color_group_change
     else
-      let guifg_change = exists('g:signify_sign_color_guifg_change') ? g:signify_sign_color_guifg_change : '#eeee11'
+      let guifg_change = get(g:, 'signify_sign_color_guifg_change', '#eeee11')
       if empty(guibg) || guibg < 0
         execute 'hi SignifyChange gui=bold guifg='. guifg_change
       else
@@ -398,7 +413,7 @@ function! s:colors_set() abort
   else
     if exists('g:signify_sign_color_ctermbg')
       let ctermbg = g:signify_sign_color_ctermbg
-    elseif exists('g:signify_sign_color_inherit_from_linenr')
+    elseif get(g:, 'signify_sign_color_inherit_from_linenr')
       let ctermbg = synIDattr(hlID('LineNr'), 'bg', 'cterm')
     else
       let ctermbg = synIDattr(hlID('SignColumn'), 'bg', 'cterm')
@@ -407,7 +422,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_add')
       execute 'hi! link SignifyAdd '. g:signify_sign_color_group_add
     else
-      let ctermfg_add = exists('g:signify_sign_color_ctermfg_add') ? g:signify_sign_color_ctermfg_add : 2
+      let ctermfg_add = get(g:, 'signify_sign_color_ctermfg_add', 2)
       if empty(ctermbg) || ctermbg < 0
         execute 'hi SignifyAdd cterm=bold ctermfg='. ctermfg_add
       else
@@ -418,7 +433,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_delete')
       execute 'hi! link SignifyDelete '. g:signify_sign_color_group_delete
     else
-      let ctermfg_delete = exists('g:signify_sign_color_ctermfg_delete') ? g:signify_sign_color_ctermfg_delete : 1
+      let ctermfg_delete = get(g:, 'signify_sign_color_ctermfg_delete', 1)
       if empty(ctermbg) || ctermbg < 0
         execute 'hi SignifyDelete cterm=bold ctermfg='. ctermfg_delete
       else
@@ -429,7 +444,7 @@ function! s:colors_set() abort
     if exists('g:signify_sign_color_group_change')
       execute 'hi! link SignifyChange '. g:signify_sign_color_group_change
     else
-      let ctermfg_change = exists('g:signify_sign_color_ctermfg_change') ? g:signify_sign_color_ctermfg_change : 3
+      let ctermfg_change = get(g:, 'signify_sign_color_ctermfg_change', 3)
       if empty(ctermbg) || ctermbg < 0
         execute 'hi SignifyChange cterm=bold ctermfg='. ctermfg_change
       else
@@ -459,34 +474,45 @@ function! s:toggle_signify() abort
   endif
 endfunction
 
-" Function: s:toggle_line_highlighting {{{1
-function! s:toggle_line_highlighting() abort
+" Function: s:line_highlighting_enable {{{1
+function! s:line_highlighting_enable() abort
+  let add    = get(g:, 'signify_line_color_add',    'DiffAdd')
+  let delete = get(g:, 'signify_line_color_delete', 'DiffDelete')
+  let change = get(g:, 'signify_line_color_change', 'DiffChange')
+
+  execute 'sign define SignifyAdd             text=+  texthl=SignifyAdd    linehl='. add
+  execute 'sign define SignifyChange          text=!  texthl=SignifyChange linehl='. change
+  execute 'sign define SignifyChangeDelete    text=!_ texthl=SignifyChange linehl='. change
+  execute 'sign define SignifyDelete          text=_  texthl=SignifyDelete linehl='. delete
+  execute 'sign define SignifyDeleteFirstLine text=‾  texthl=SignifyDelete linehl='. delete
+
+  let s:line_highlight = 1
+endfunction
+
+" Function: s:line_highlighting_disable {{{1
+function! s:line_highlighting_disable() abort
+  sign define SignifyAdd             text=+  texthl=SignifyAdd    linehl=none
+  sign define SignifyChange          text=!  texthl=SignifyChange linehl=none
+  sign define SignifyChangeDelete    text=!_ texthl=SignifyChange linehl=none
+  sign define SignifyDelete          text=_  texthl=SignifyDelete linehl=none
+  sign define SignifyDeleteFirstLine text=‾  texthl=SignifyDelete linehl=none
+
+  let s:line_highlight = 0
+endfunction
+
+" Function: s:line_highlighting_toggle {{{1
+function! s:line_highlighting_toggle() abort
   if !has_key(s:sy, s:path)
     echo 'signify: I cannot detect any changes!'
     return
   endif
 
   if s:line_highlight
-    sign define SignifyAdd             text=+  texthl=SignifyAdd    linehl=none
-    sign define SignifyChange          text=!  texthl=SignifyChange linehl=none
-    sign define SignifyChangeDelete    text=!_ texthl=SignifyChange linehl=none
-    sign define SignifyDelete          text=_  texthl=SignifyDelete linehl=none
-    sign define SignifyDeleteFirstLine text=‾  texthl=SignifyDelete linehl=none
-
-    let s:line_highlight = 0
+    call s:line_highlighting_disable()
   else
-    let add    = exists('g:signify_line_color_add')    ? g:signify_line_color_add    : 'DiffAdd'
-    let delete = exists('g:signify_line_color_delete') ? g:signify_line_color_delete : 'DiffDelete'
-    let change = exists('g:signify_line_color_change') ? g:signify_line_color_change : 'DiffChange'
-
-    execute 'sign define SignifyAdd             text=+  texthl=SignifyAdd    linehl='. add
-    execute 'sign define SignifyChange          text=!  texthl=SignifyChange linehl='. change
-    execute 'sign define SignifyChangeDelete    text=!_ texthl=SignifyChange linehl='. change
-    execute 'sign define SignifyDelete          text=_  texthl=SignifyDelete linehl='. delete
-    execute 'sign define SignifyDeleteFirstLine text=‾  texthl=SignifyDelete linehl='. delete
-
-    let s:line_highlight = 1
+    call s:line_highlighting_enable()
   endif
+
   call s:start(s:path)
 endfunction
 
@@ -552,7 +578,7 @@ function s:escape(path) abort
   return path
 endfunction
 
-" Function: SignifyDebugListActiveBuffers() {{{1
+" Function: SignifyDebugListActiveBuffers {{{1
 function! SignifyDebugListActiveBuffers() abort
   if empty(s:sy)
     echo 'No active buffers!'
