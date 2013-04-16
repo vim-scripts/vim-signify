@@ -10,7 +10,7 @@ It's __fast__, __highly configurable__ and __well documented__.
 
 Features:
 
-- supports git, mercurial, darcs, bazaar, subversion, cvs, rcs
+- supports git, mercurial, darcs, bazaar, subversion, cvs, rcs, fossil
 - quick jumping between changed lines
 - apart from signs there is also optional line highlighting
 - fully configurable through global variables (options and mappings)
@@ -73,6 +73,12 @@ A line was changed. Something was changed, but the amount of lines stayed the sa
 
 A line was changed and one or more of the lines below were deleted. A combination of **!** and **_**. The sign is shown on the same line.
 
+
+`‾`
+
+The first line was deleted. This special case is indicated by **‾** rather than
+**_**.
+
 Longer introduction
 -------------------
 
@@ -91,6 +97,7 @@ Current the following VCS are supported:
 - subversion (svn)
 - cvs
 - rcs
+- fossil
 
 #### quick jumping between changed lines
 
@@ -200,6 +207,7 @@ let g:signify_line_highlight = 1
 let g:signify_sign_add               = '+'
 let g:signify_sign_delete            = '-'
 let g:signify_sign_change            = '*'
+let g:signify_sign_change_delete     = '*_'
 let g:signify_sign_delete_first_line = '‾'
 
 let g:signify_sign_color_guifg_add      = '#00ff00'

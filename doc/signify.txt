@@ -53,6 +53,7 @@ version control system:
     - subversion
     - cvs
     - rcs
+    - fossil
 
 The plugin defines 4 new kinds of signs and their corresponding highlighting
 groups. It tries to inherent existing colors from the SignColumn group, if
@@ -81,6 +82,10 @@ same. The sign is shown on the same line.
 A line was changed and one or more of the lines below were deleted. A
 combination of ! and _. The sign is shown on the same line.
 
+    ‾
+
+This is used instead of _ in the special case of the first line being removed.
+
 
 ==============================================================================
 3. Options                                                     *signify-options*
@@ -92,11 +97,22 @@ not defaults.
 
     let g:signify_vcs_list = [ 'git', 'hg' ]
 
-A list of VCS to check for. This can improve buffer loading time since by
-default all supported VCS will be checked for.
+Default: ['git', 'hg', 'svn', 'darcs', 'bzr', 'fossil', 'cvs', 'rcs']
 
-NOTE: This only happens once at buffer loading. Afterwards, the VCS will be
-remembered anyway.
+This variable determines the VCS to check for and in what order. If you only
+use git and mercurial, you can shorten the list to the shown example. If you
+use mostly mercurial and only sometimes git, put 'hg' in the front of the
+list. It's basically a priority list.
+
+This can improve buffer loading time since by default all supported VCS will
+be checked for, so you are advised to change this variable to your needs.
+
+NOTE: This only happens once the first time signs get updated. Afterwards, the
+VCS will be remembered anyway.
+
+NOTE: If you don't change this list and Sy is activated, updating signs for a
+non-VCS file can lead to significant delay since all supported VCS will be
+tested for.
 
 ============-
 
@@ -271,7 +287,7 @@ Jeremy Mack       (mutewinter)
 Chong Li          (chongli)
 Robin Munn        (rmunn)
 Martin Hoch       (rtwo)
-fritzophrenic     (fritzophrenic)
+fritzophrenic     (Ben Fritz)
 Morgan Fouesneau  (mfouesneau)
 Zhao Cai          (zhaocai)
 Otto Modinos      (otommod)

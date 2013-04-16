@@ -1,7 +1,7 @@
 " Plugin:      https://github.com/mhinz/vim-signify
 " Description: show a diff from a version control system via the signcolumn
 " Maintainer:  Marco Hinz <http://github.com/mhinz>
-" Version:     1.6
+" Version:     1.7
 
 if exists('g:loaded_signify') || !has('signs') || &cp
   finish
@@ -14,7 +14,7 @@ let s:other_signs_line_numbers = {}
 
 " overwrite non-signify signs by default
 let s:sign_overwrite = get(g:, 'signify_sign_overwrite', 1)
-let s:vcs_list       = get(g:, 'signify_vcs_list', [ 'git', 'hg', 'svn', 'darcs', 'bzr', 'cvs', 'rcs' ])
+let s:vcs_list       = get(g:, 'signify_vcs_list', [ 'git', 'hg', 'svn', 'darcs', 'bzr', 'fossil', 'cvs', 'rcs' ])
 
 let s:id_start = 0x100
 let s:id_top   = s:id_start
@@ -58,22 +58,28 @@ augroup signify
   endif
 
   if get(g:, 'signify_cursorhold_normal')
-    autocmd CursorHold *
-          \ if filewritable(s:path) && empty(&buftype) |
-          \   update | call s:start(s:path) |
+    autocmd CursorHold * nested
+          \ if has_key(s:sy, s:path) && s:sy[s:path].active && &modified |
+          \   write |
           \ endif
   endif
 
   if get(g:, 'signify_cursorhold_insert')
-    autocmd CursorHoldI *
-          \ if filewritable(s:path) && empty(&buftype) |
-          \   update | call s:start(s:path) |
+    autocmd CursorHoldI * nested
+          \ if has_key(s:sy, s:path) && s:sy[s:path].active && &modified |
+          \   write |
           \ endif
   endif
 
   if !has('gui_win32')
     autocmd FocusGained * call s:start(s:path)
   endif
+
+  autocmd BufDelete *
+        \ call s:stop(s:path) |
+        \ if has_key(s:sy, s:path) |
+        \   call remove(s:sy, s:path) |
+        \ endif
 augroup END
 
 " Init: commands {{{1
@@ -83,11 +89,6 @@ com! -nargs=0 -bar -count SignifyJumpToNextHunk  call s:jump_to_next_hunk(<count
 com! -nargs=0 -bar -count SignifyJumpToPrevHunk  call s:jump_to_prev_hunk(<count>)
 
 " Init: mappings {{{1
-if !maparg('[c', 'n')
-  nnoremap <silent> ]c :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
-  nnoremap <silent> [c :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
-endif
-
 if exists('g:signify_mapping_next_hunk')
   execute 'nnoremap <silent> '. g:signify_mapping_next_hunk .' :<c-u>execute v:count ."SignifyJumpToNextHunk"<cr>'
 else
@@ -112,12 +113,27 @@ else
   nnoremap <silent> <leader>gt :SignifyToggle<cr>
 endif
 
-" Function: s:start {{{1
-function! s:start(path) abort
-  if get(b:, 'signmode')
-    execute 'sign place 99999 line=1 name=SignifyPlaceholder file='. a:path
+" Function: s:toggle_signify {{{1
+function! s:toggle_signify() abort
+  if empty(s:path)
+    echo 'signify: I cannot sy empty buffers!'
+    return
   endif
 
+  if has_key(s:sy, s:path)
+    if s:sy[s:path].active
+      call s:stop(s:path)
+    else
+      let s:sy[s:path].active = 1
+      call s:start(s:path)
+    endif
+  else
+    call s:start(s:path)
+  endif
+endfunction
+
+" Function: s:start {{{1
+function! s:start(path) abort
   if !filereadable(a:path)
         \ || (exists('g:signify_skip_filetype') && has_key(g:signify_skip_filetype, &ft))
         \ || (exists('g:signify_skip_filename') && has_key(g:signify_skip_filename, a:path))
@@ -128,21 +144,17 @@ function! s:start(path) abort
   if !has_key(s:sy, a:path)
     let [ diff, type ] = s:repo_detect(a:path)
     if empty(diff)
-      sign unplace 99999
       return
     endif
     let s:sy[a:path] = { 'active': 1, 'type': type, 'ids': [], 'id_jump': s:id_top, 'id_top': s:id_top, 'last_jump_was_next': -1 }
   " Inactive buffer.. bail out.
   elseif !s:sy[a:path].active
-    sign unplace 99999
-    let b:signmode = 0
     return
+  " Update signs.
   else
-    call s:sign_remove_all(a:path)
     let diff = s:repo_get_diff_{s:sy[a:path].type}(a:path)
     if empty(diff)
-      sign unplace 99999
-      let b:signmode = 0
+      call s:sign_remove_all(a:path)
       return
     endif
     let s:sy[a:path].id_top  = s:id_top
@@ -162,10 +174,16 @@ function! s:start(path) abort
     call s:sign_get_others(a:path)
   endif
 
+  execute 'sign place 99999 line=1 name=SignifyPlaceholder file='. a:path
+  call s:sign_remove_all(a:path)
   call s:repo_process_diff(a:path, diff)
-
   sign unplace 99999
-  let b:signmode = 1
+
+  if !maparg('[c', 'n')
+    nnoremap <buffer><silent> ]c :<c-u>execute v:count .'SignifyJumpToNextHunk'<cr>
+    nnoremap <buffer><silent> [c :<c-u>execute v:count .'SignifyJumpToPrevHunk'<cr>
+  endif
+
   let s:sy[a:path].id_top = (s:id_top - 1)
 endfunction
 
@@ -177,15 +195,14 @@ function! s:stop(path) abort
 
   call s:sign_remove_all(a:path)
 
-  if !s:sy[a:path].active
-    return
-  else
-    call remove(s:sy, a:path)
-  endif
+  silent! nunmap <buffer> ]c
+  silent! nunmap <buffer> [c
 
   augroup signify
     autocmd! * <buffer>
   augroup END
+
+  let s:sy[s:path].active = 0
 endfunction
 
 " Function: s:sign_get_others {{{1
@@ -220,7 +237,6 @@ function! s:sign_remove_all(path) abort
   endfor
 
   let s:other_signs_line_numbers = {}
-  let s:sy[a:path].id_jump = -1
   let s:sy[a:path].ids = []
 endfunction
 
@@ -272,6 +288,14 @@ endfunction
 function! s:repo_get_diff_darcs(path) abort
   if executable('darcs')
     let diff = system('cd '. s:escape(fnamemodify(a:path, ':h')) .' && darcs diff --no-pause-for-gui --diff-command="'. s:difftool .' -U0 %1 %2" -- '. s:escape(a:path))
+    return v:shell_error ? '' : diff
+  endif
+endfunction
+
+" Function: s:repo_get_diff_fossil {{{1
+function! s:repo_get_diff_fossil(path) abort
+  if executable('fossil')
+    let diff = system('cd '. s:escape(fnamemodify(a:path, ':h')) .' && fossil set diff-command "'. s:difftool .' -U 0" && fossil diff --unified -c 0 -- '. s:escape(a:path))
     return v:shell_error ? '' : diff
   endif
 endfunction
@@ -433,31 +457,11 @@ function! s:colors_set() abort
   endif
 endfunction
 
-" Function: s:toggle_signify {{{1
-function! s:toggle_signify() abort
-  if empty(s:path)
-    echo 'signify: I cannot sy empty buffers!'
-    return
-  endif
-
-  if has_key(s:sy, s:path)
-    if s:sy[s:path].active
-      let s:sy[s:path].active = 0
-      call s:stop(s:path)
-    else
-      let s:sy[s:path].active = 1
-      call s:start(s:path)
-    endif
-  else
-    call s:start(s:path)
-  endif
-endfunction
-
 " Function: s:line_highlighting_enable {{{1
 function! s:line_highlighting_enable() abort
   execute 'sign define SignifyAdd text='. s:sign_add .' texthl=SignifyAdd linehl='. s:line_color_add
   execute 'sign define SignifyChange text='. s:sign_change .' texthl=SignifyChange linehl='. s:line_color_change
-  execute 'sign define SignifyChangeDelete text='. s:sign_delete .' texthl=SignifyChange linehl='. s:line_color_change
+  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl='. s:line_color_change
   execute 'sign define SignifyDelete text='. s:sign_delete .' texthl=SignifyDelete linehl='. s:line_color_delete
   execute 'sign define SignifyDeleteFirstLine text='. s:sign_delete_first_line .' texthl=SignifyDelete linehl='. s:line_color_delete
 
@@ -468,7 +472,7 @@ endfunction
 function! s:line_highlighting_disable() abort
   execute 'sign define SignifyAdd text='. s:sign_add .' texthl=SignifyAdd linehl=none'
   execute 'sign define SignifyChange text='. s:sign_change .' texthl=SignifyChange linehl=none'
-  execute 'sign define SignifyChangeDelete text='. s:sign_delete .' texthl=SignifyChange linehl=none'
+  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl=none'
   execute 'sign define SignifyDelete text='. s:sign_delete .' texthl=SignifyDelete linehl=none'
   execute 'sign define SignifyDeleteFirstLine text='. s:sign_delete_first_line .' texthl=SignifyDelete linehl=none'
 
