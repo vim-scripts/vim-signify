@@ -1,7 +1,7 @@
 " Plugin:      https://github.com/mhinz/vim-signify
 " Description: show a diff from a version control system via the signcolumn
 " Maintainer:  Marco Hinz <http://github.com/mhinz>
-" Version:     1.7
+" Version:     1.8
 
 if exists('g:loaded_signify') || !has('signs') || &cp
   finish
@@ -19,9 +19,10 @@ let s:vcs_list       = get(g:, 'signify_vcs_list', [ 'git', 'hg', 'svn', 'darcs'
 let s:id_start = 0x100
 let s:id_top   = s:id_start
 
-let s:line_color_add    = get(g:, 'signify_line_color_add',    'DiffAdd')
-let s:line_color_delete = get(g:, 'signify_line_color_delete', 'DiffDelete')
-let s:line_color_change = get(g:, 'signify_line_color_change', 'DiffChange')
+let s:line_color_add           = get(g:, 'signify_line_color_add',           'DiffAdd')
+let s:line_color_delete        = get(g:, 'signify_line_color_delete',        'DiffDelete')
+let s:line_color_change        = get(g:, 'signify_line_color_change',        'DiffChange')
+let s:line_color_change_delete = get(g:, 'signify_line_color_change_delete', 'DiffChange')
 
 let s:sign_add               = get(g:, 'signify_sign_add',               '+')
 let s:sign_delete            = get(g:, 'signify_sign_delete',            '_')
@@ -29,32 +30,41 @@ let s:sign_delete_first_line = get(g:, 'signify_sign_delete_first_line', '‾')
 let s:sign_change            = get(g:, 'signify_sign_change',            '!')
 let s:sign_change_delete     = get(g:, 'signify_sign_change_delete',     '!_')
 
-if has('win32')
-  if $VIMRUNTIME =~ ' '
-    let s:difftool = (&sh =~ '\<cmd') ? ('"'. $VIMRUNTIME .'\diff"') : (substitute($VIMRUNTIME, ' ', '" ', '') .'\diff"')
-  else
-    let s:difftool = $VIMRUNTIME .'\diff'
-  endif
+if get(g:, 'signify_difftool')
+  let s:difftool = g:signify_difftool
 else
-  if !executable('diff')
-    echomsg 'signify: No diff tool found!'
-    finish
+  if has('win32')
+    if $VIMRUNTIME =~ ' '
+      let s:difftool = (&sh =~ '\<cmd')
+            \ ? ('"'. $VIMRUNTIME .'\diff"')
+            \ : (substitute($VIMRUNTIME, ' ', '" ', '') .'\diff"')
+    else
+      let s:difftool = $VIMRUNTIME .'\diff'
+    endif
+  else
+    if !executable('diff')
+      echomsg 'signify: No diff tool found!'
+      finish
+    endif
+    let s:difftool = 'diff'
   endif
-  let s:difftool = 'diff'
 endif
 
-sign define SignifyPlaceholder text=. texthl=SignifyChange linehl=none
+sign define SignifyPlaceholder text=. texthl=SignifyChange linehl=NONE
 
 " Init: autocmds {{{1
 augroup signify
   autocmd!
 
-  autocmd BufEnter             * let s:path = resolve(expand('<afile>:p'))
-  autocmd BufWritePost         * call s:start(s:path)
+  autocmd BufRead,BufEnter     * let s:path = resolve(expand('<afile>:p'))
+  autocmd BufRead,BufWritePost * call s:start(s:path)
   autocmd VimEnter,ColorScheme * call s:colors_set()
 
-  if get(g:, 'signify_update_on_bufenter', 1)
-    autocmd BufEnter * call s:start(s:path)
+  if get(g:, 'signify_update_on_bufenter')
+    autocmd BufEnter * nested
+          \ if has_key(s:sy, s:path) && s:sy[s:path].active && &modified |
+          \   write |
+          \ endif
   endif
 
   if get(g:, 'signify_cursorhold_normal')
@@ -76,9 +86,11 @@ augroup signify
   endif
 
   autocmd BufDelete *
-        \ call s:stop(s:path) |
-        \ if has_key(s:sy, s:path) |
-        \   call remove(s:sy, s:path) |
+        \ if exists('s:path') |
+        \   call s:stop(s:path) |
+        \   if has_key(s:sy, s:path) |
+        \     call remove(s:sy, s:path) |
+        \   endif |
         \ endif
 augroup END
 
@@ -372,13 +384,15 @@ endfunction
 
 " Function: s:colors_set {{{1
 function! s:colors_set() abort
+  let weight = get(g:, 'signify_sign_weight', 'bold')
+
   if has('gui_running')
     if exists('g:signify_sign_color_guibg')
       let guibg = g:signify_sign_color_guibg
     elseif get(g:, 'signify_sign_color_inherit_from_linenr')
-      let guibg = synIDattr(hlID('LineNr'), 'bg', 'gui')
+      let guibg = synIDattr(synIDtrans(hlID('LineNr')), 'bg', 'gui')
     else
-      let guibg = synIDattr(hlID('SignColumn'), 'bg', 'gui')
+      let guibg = synIDattr(synIDtrans(hlID('SignColumn')), 'bg', 'gui')
     endif
 
     if exists('g:signify_sign_color_group_add')
@@ -386,9 +400,9 @@ function! s:colors_set() abort
     else
       let guifg_add = get(g:, 'signify_sign_color_guifg_add', '#11ee11')
       if empty(guibg) || guibg < 0
-        execute 'hi SignifyAdd gui=bold guifg='. guifg_add
+        execute 'hi SignifyAdd gui='. weight .' guifg='. guifg_add
       else
-        execute 'hi SignifyAdd gui=bold guifg='. guifg_add .' guibg='. guibg
+        execute 'hi SignifyAdd gui='. weight .' guifg='. guifg_add .' guibg='. guibg
       endif
     endif
 
@@ -397,9 +411,9 @@ function! s:colors_set() abort
     else
       let guifg_delete = get(g:, 'signify_sign_color_guifg_delete', '#ee1111')
       if empty(guibg) || guibg < 0
-        execute 'hi SignifyDelete gui=bold guifg='. guifg_delete
+        execute 'hi SignifyDelete gui='. weight .' guifg='. guifg_delete
       else
-        execute 'hi SignifyDelete gui=bold guifg='. guifg_delete .' guibg='. guibg
+        execute 'hi SignifyDelete gui='. weight .' guifg='. guifg_delete .' guibg='. guibg
       endif
     endif
 
@@ -408,18 +422,18 @@ function! s:colors_set() abort
     else
       let guifg_change = get(g:, 'signify_sign_color_guifg_change', '#eeee11')
       if empty(guibg) || guibg < 0
-        execute 'hi SignifyChange gui=bold guifg='. guifg_change
+        execute 'hi SignifyChange gui='. weight .' guifg='. guifg_change
       else
-        execute 'hi SignifyChange gui=bold guifg='. guifg_change .' guibg='. guibg
+        execute 'hi SignifyChange gui='. weight .' guifg='. guifg_change .' guibg='. guibg
       endif
     endif
   else
     if exists('g:signify_sign_color_ctermbg')
       let ctermbg = g:signify_sign_color_ctermbg
     elseif get(g:, 'signify_sign_color_inherit_from_linenr')
-      let ctermbg = synIDattr(hlID('LineNr'), 'bg', 'cterm')
+      let ctermbg = synIDattr(synIDtrans(hlID('LineNr')), 'bg', 'cterm')
     else
-      let ctermbg = synIDattr(hlID('SignColumn'), 'bg', 'cterm')
+      let ctermbg = synIDattr(synIDtrans(hlID('SignColumn')), 'bg', 'cterm')
     endif
 
     if exists('g:signify_sign_color_group_add')
@@ -427,9 +441,9 @@ function! s:colors_set() abort
     else
       let ctermfg_add = get(g:, 'signify_sign_color_ctermfg_add', 2)
       if empty(ctermbg) || ctermbg < 0
-        execute 'hi SignifyAdd cterm=bold ctermfg='. ctermfg_add
+        execute 'hi SignifyAdd cterm='. weight .' ctermfg='. ctermfg_add
       else
-        execute 'hi SignifyAdd cterm=bold ctermfg='. ctermfg_add .' ctermbg='. ctermbg
+        execute 'hi SignifyAdd cterm='. weight .' ctermfg='. ctermfg_add .' ctermbg='. ctermbg
       endif
     endif
 
@@ -438,9 +452,9 @@ function! s:colors_set() abort
     else
       let ctermfg_delete = get(g:, 'signify_sign_color_ctermfg_delete', 1)
       if empty(ctermbg) || ctermbg < 0
-        execute 'hi SignifyDelete cterm=bold ctermfg='. ctermfg_delete
+        execute 'hi SignifyDelete cterm='. weight .' ctermfg='. ctermfg_delete
       else
-        execute 'hi SignifyDelete cterm=bold ctermfg='. ctermfg_delete .' ctermbg='. ctermbg
+        execute 'hi SignifyDelete cterm='. weight .' ctermfg='. ctermfg_delete .' ctermbg='. ctermbg
       endif
     endif
 
@@ -449,9 +463,9 @@ function! s:colors_set() abort
     else
       let ctermfg_change = get(g:, 'signify_sign_color_ctermfg_change', 3)
       if empty(ctermbg) || ctermbg < 0
-        execute 'hi SignifyChange cterm=bold ctermfg='. ctermfg_change
+        execute 'hi SignifyChange cterm='. weight .' ctermfg='. ctermfg_change
       else
-        execute 'hi SignifyChange cterm=bold ctermfg='. ctermfg_change .' ctermbg='. ctermbg
+        execute 'hi SignifyChange cterm='. weight .' ctermfg='. ctermfg_change .' ctermbg='. ctermbg
       endif
     endif
   endif
@@ -461,7 +475,7 @@ endfunction
 function! s:line_highlighting_enable() abort
   execute 'sign define SignifyAdd text='. s:sign_add .' texthl=SignifyAdd linehl='. s:line_color_add
   execute 'sign define SignifyChange text='. s:sign_change .' texthl=SignifyChange linehl='. s:line_color_change
-  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl='. s:line_color_change
+  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl='. s:line_color_change_delete
   execute 'sign define SignifyDelete text='. s:sign_delete .' texthl=SignifyDelete linehl='. s:line_color_delete
   execute 'sign define SignifyDeleteFirstLine text='. s:sign_delete_first_line .' texthl=SignifyDelete linehl='. s:line_color_delete
 
@@ -470,11 +484,11 @@ endfunction
 
 " Function: s:line_highlighting_disable {{{1
 function! s:line_highlighting_disable() abort
-  execute 'sign define SignifyAdd text='. s:sign_add .' texthl=SignifyAdd linehl=none'
-  execute 'sign define SignifyChange text='. s:sign_change .' texthl=SignifyChange linehl=none'
-  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl=none'
-  execute 'sign define SignifyDelete text='. s:sign_delete .' texthl=SignifyDelete linehl=none'
-  execute 'sign define SignifyDeleteFirstLine text='. s:sign_delete_first_line .' texthl=SignifyDelete linehl=none'
+  execute 'sign define SignifyAdd text='. s:sign_add .' texthl=SignifyAdd linehl=NONE'
+  execute 'sign define SignifyChange text='. s:sign_change .' texthl=SignifyChange linehl=NONE'
+  execute 'sign define SignifyChangeDelete text='. s:sign_change_delete .' texthl=SignifyChange linehl=NONE'
+  execute 'sign define SignifyDelete text='. s:sign_delete .' texthl=SignifyDelete linehl=NONE'
+  execute 'sign define SignifyDeleteFirstLine text='. s:sign_delete_first_line .' texthl=SignifyDelete linehl=NONE'
 
   let s:line_highlight = 0
 endfunction

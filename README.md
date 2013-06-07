@@ -1,3 +1,10 @@
+
+
+NEWS: Sy is pretty stable at the moment, so there will be no commits (apart from
+bugfixes/feature requests) in the next ~month. I'm mainly working at Sy 2.0 at the
+moment. Stay tuned! :-)
+
+
 vim-signify
 -----------
 
@@ -88,7 +95,7 @@ This plugin is based on the diffing features of the supported version control
 systems. Since not all VCS support the same options, sometimes we have to fall
 back to the 'diff' executable.
 
-Current the following VCS are supported:
+Currently the following VCS are supported:
 
 - git
 - mercurial (hg)
@@ -126,9 +133,10 @@ let g:signify_mapping_toggle_highlight = '<leader>gh'
 You can also change the highlighting classes for these lines. The defaults are:
 
 ```vim
-let g:signify_line_color_add    = 'DiffAdd'
-let g:signify_line_color_delete = 'DiffDelete'
-let g:signify_line_color_change = 'DiffChange'
+let g:signify_line_color_add           = 'DiffAdd'
+let g:signify_line_color_delete        = 'DiffDelete'
+let g:signify_line_color_change        = 'DiffChange'
+let g:signify_line_color_change_delete = 'DiffChange'
 ```
 
 #### you can toggle the plugin per buffer
@@ -203,6 +211,8 @@ let g:signify_sign_overwrite = 1
 let g:signify_update_on_bufenter = 1
 
 let g:signify_line_highlight = 1
+
+let g:signify_sign_weight = 'bold'
 
 let g:signify_sign_add               = '+'
 let g:signify_sign_delete            = '-'

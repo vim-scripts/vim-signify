@@ -150,18 +150,28 @@ Overwrite signs set by other plugins by default.
 
 ============-
 
-    let g:signify_update_on_bufenter = 1
+    let g:signify_update_on_bufenter = 0
 
-Update signs when entering a buffer.
+Update signs when entering a buffer that was modified.
 
-NOTE: Disable this if you're working in huge repositories and experience
-delays.
+NOTE: This also saves the buffer to disk!
 
 ============-
 
     let g:signify_line_highlight = 1
 
 Enable line highlighting in addation to using signs.
+
+============-
+
+    let g:signify_sign_weight = 'bold'
+
+Possible values: 'bold' (default), 'NONE'
+
+Use either bold or normal font weight.
+
+NOTE: If you experience colors not getting set properly, try changing this
+variable to 'NONE'.
 
 ============-
 
@@ -204,9 +214,10 @@ Example:
 
 ============-
 
-    let g:signify_line_color_add    = 'DiffAdd'
-    let g:signify_line_color_delete = 'DiffDelete'
-    let g:signify_line_color_change = 'DiffChange'
+    let g:signify_line_color_add           = 'DiffAdd'
+    let g:signify_line_color_delete        = 'DiffDelete'
+    let g:signify_line_color_change        = 'DiffChange'
+    let g:signify_line_color_change_delete = 'DiffChange'
 
 The highlight groups to use with line highlighting.
 
@@ -226,6 +237,16 @@ miliseconds without any keypresses. This fires only once between keypresses,
 thus not every 'updatetime' miliseconds.
 
 NOTE: This also saves the buffer to disk!
+
+============-
+
+    let g:signify_difftool = 'gnudiff'
+
+This will avoid the attempt to find the proper diff tool for version control
+systems that rely on an external diff tool that supports the -U0 flag. These
+are: svn, bzr, darcs, fossil.
+
+Otherwise 'diff' will be used.
 
 
 ==============================================================================
@@ -283,15 +304,17 @@ Thank you for flying mhi airlines. Get the Vim on!
 People who contributed to sy. Format: Person (Github account)
 
 
-Jeremy Mack       (mutewinter)
-Chong Li          (chongli)
-Robin Munn        (rmunn)
-Martin Hoch       (rtwo)
-fritzophrenic     (Ben Fritz)
-Morgan Fouesneau  (mfouesneau)
-Zhao Cai          (zhaocai)
-Otto Modinos      (otommod)
-Ryan Kois         (kid-icarus)
+Jeremy Mack            (mutewinter)
+Chong Li               (chongli)
+Robin Munn             (rmunn)
+Martin Hoch            (rtwo)
+fritzophrenic          (Ben Fritz)
+Morgan Fouesneau       (mfouesneau)
+Zhao Cai               (zhaocai)
+Otto Modinos           (otommod)
+Ryan Kois              (kid-icarus)
+Jon Kinney             (j2fly)
+Israel Chauca Fuentes  (Raimondi)
 
 
 ==============================================================================
