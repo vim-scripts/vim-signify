@@ -28,7 +28,7 @@ Features:
 
 - quick developer response! :-)
 
-![Example:signify in action](https://github.com/mhinz/vim-signify/raw/master/signify.png)
+![Example:signify in action](https://github.com/mhinz/vim-signify/raw/master/signify.gif)
 
 Limits exist only in your mind!
 
@@ -68,23 +68,26 @@ Sign explanation
 
 A new line was added. The sign is shown on the same line as the new line.
 
-`_`
+`_1`
 
-A line was deleted. The sign is shown on the line above the deleted line. Special case: The first line was deleted. In this case the sign is shown on the same line.
+A line was deleted. The sign is shown on the line above the deleted line. The
+second character indicates the number of deleted lines: 1-9, and # for
+everything above.
 
 `!`
 
-A line was changed. Something was changed, but the amount of lines stayed the same. The sign is shown on the same line.
+A line was changed. Something was changed, but the amount of lines stayed the
+same. The sign is shown on the same line.
 
 `!_`
 
-A line was changed and one or more of the lines below were deleted. A combination of **!** and **_**. The sign is shown on the same line.
+A line was changed and one or more of the lines below were deleted. A
+combination of **!** and **_**. The sign is shown on the same line.
 
 
 `‾`
 
-The first line was deleted. This special case is indicated by **‾** rather than
-**_**.
+This is used instead of _ in the special case of the first line being removed.
 
 Longer introduction
 -------------------
@@ -108,8 +111,9 @@ Currently the following VCS are supported:
 
 #### quick jumping between changed lines
 
-There are mappings for jumping forth and back between changed lines (so-called
-hunks). The following example shows the default mappings and how to change them:
+There are mappings for jumping forth and back between blocks of changes
+(so-called hunks). The following example shows the default mappings and how to
+change them:
 
 ```vim
 let g:signify_mapping_next_hunk = '<leader>gj'
@@ -128,15 +132,6 @@ the concerned lines:
 
 ```vim
 let g:signify_mapping_toggle_highlight = '<leader>gh'
-```
-
-You can also change the highlighting classes for these lines. The defaults are:
-
-```vim
-let g:signify_line_color_add           = 'DiffAdd'
-let g:signify_line_color_delete        = 'DiffDelete'
-let g:signify_line_color_change        = 'DiffChange'
-let g:signify_line_color_change_delete = 'DiffChange'
 ```
 
 #### you can toggle the plugin per buffer
@@ -190,12 +185,16 @@ Documentation
 Configuration
 -------------
 
+__NOTE__: The shown assignments are only examples. You can find the default
+values in the help.
+
 For more info: `:h signify-options`
 
-__NOTE__: The shown assignments are only examples, not defaults.
 
 ```vim
 let g:signify_vcs_list = [ 'git', 'hg' ]
+
+let g:signify_difftool = 'gnudiff'
 
 let g:signify_mapping_next_hunk = '<leader>gj'
 let g:signify_mapping_prev_hunk = '<leader>gk'
@@ -212,31 +211,11 @@ let g:signify_update_on_bufenter = 1
 
 let g:signify_line_highlight = 1
 
-let g:signify_sign_weight = 'bold'
-
 let g:signify_sign_add               = '+'
 let g:signify_sign_delete            = '-'
 let g:signify_sign_change            = '*'
 let g:signify_sign_change_delete     = '*_'
 let g:signify_sign_delete_first_line = '‾'
-
-let g:signify_sign_color_guifg_add      = '#00ff00'
-let g:signify_sign_color_guifg_delete   = '#ff0000'
-let g:signify_sign_color_guifg_change   = '#ffff00'
-let g:signify_sign_color_guibg          = '#111111'
-
-let g:signify_sign_color_ctermfg_add    = 2
-let g:signify_sign_color_ctermfg_delete = 1
-let g:signify_sign_color_ctermfg_change = 3
-let g:signify_sign_color_ctermbg        = 0
-
-let g:signify_sign_color_group_add    = 'MyAdd'
-let g:signify_sign_color_group_delete = 'MyDelete'
-let g:signify_sign_color_group_change = 'MyChange'
-
-let g:signify_line_color_add    = 'DiffAdd'
-let g:signify_line_color_delete = 'DiffDelete'
-let g:signify_line_color_change = 'DiffChange'
 
 let g:signify_cursorhold_normal = 1
 let g:signify_cursorhold_insert = 1
