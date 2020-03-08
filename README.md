@@ -28,7 +28,7 @@ Features:
 
 - quick developer response! :-)
 
-![Example:signify in action](https://github.com/mhinz/vim-signify/raw/master/signify.gif)
+![Example:signify in action](https://raw.githubusercontent.com/mhinz/vim-signify/master/pictures/signify-demo.gif)
 
 Limits exist only in your mind!
 
